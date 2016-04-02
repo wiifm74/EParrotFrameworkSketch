@@ -18,13 +18,13 @@
 struct temperatureSensor {
   //temperatureSensorClassObject sensor;	// Declare sensor object here e.g. DS18B20 or SMT172 or PT-100
   String sensorName;				// Sensor Name
-  TToABV tToAVB; 				// Instance or ToToAVB.h
+  TToABV tToABV; 				// Instance or ToToAVB.h
   int state;        				// Input for calculating LIQUID or VAPOR ABV
 };
 
 /*-----( Declare variables )-----*/
 // Declare array of sensors
-temperatureSensor temperatureSensors[TOTAL_TEMPERATURE_SENSORS]
+temperatureSensor temperatureSensors[TOTAL_TEMPERATURE_SENSORS];
 
 //Declare asynchronous function last event times
 unsigned long lastTemperatureRead;
@@ -46,7 +46,7 @@ void setup() {
   // Boiler sensor
   sensorID = 1;
   temperatureSensors[sensorID].sensorName = "Boiler";
-  temperatureSensors[sensorID].isLiquid = LIQUID;
+  temperatureSensors[sensorID].state = LIQUID;
 
   for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
     // Initialise looping/repeated temperature sensor values
@@ -54,14 +54,14 @@ void setup() {
     // set tToABV object to calculate correct ABV values
     switch (temperatureSensors[i].state) {
       case VAPOR:
-        temperatureSensors[1].tToABV.SetVapor();
+        temperatureSensors[1].tToABV.Vapor();
         break;
       case LIQUID:
-        temperatureSensors[1].tToABV.SetVapor();
+        temperatureSensors[1].tToABV.Liquid();
         break;
       default:
         // something is wrong, set to vapor
-        temperatureSensors[1].tToABV.SetVapor();
+        temperatureSensors[1].tToABV.Vapor();
         break;
     }
   }
@@ -145,9 +145,9 @@ void writeSerial() {
 
   for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
     Serial.println(temperatureSensors[i].sensorName);
-    serial.print("Temperature: "); serial.print(temperatureSensors[i].tToABV.Temperature, 2); serial.println("c");
-    serial.print("Pressure: "); serial.print(temperatureSensors[i].tToABV.Pressure, 2);  serial.println("mbar");
-    serial.print("ABV: "); serial.print(temperatureSensors[i].tToABV.ABV, 2); serial.println("%");
+    Serial.print("Temperature: "); Serial.print(temperatureSensors[i].tToABV.Temperature(), 2); Serial.println("c");
+    Serial.print("Pressure: "); Serial.print(temperatureSensors[i].tToABV.Pressure(), 2);  Serial.println("mbar");
+    Serial.print("ABV: "); Serial.print(temperatureSensors[i].tToABV.ABV(), 2); Serial.println("%");
     serialDivider();
   }
 
