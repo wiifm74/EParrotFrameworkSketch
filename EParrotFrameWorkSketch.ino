@@ -1,3 +1,12 @@
+/*-----( Feature Definitions )-----*/
+//#define FEATURE_ENABLED_ADAFRUIT_BMP180
+
+// Adafruit BMP180 pressure sensor library
+#ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
+#include <Adafruit_Sensor.h>            // https://github.com/adafruit/Adafruit_Sensor
+#include <Adafruit_BMP085_U.h>          // https://github.com/adafruit/Adafruit-BMP085-Library
+#endif
+
 #include <TToABV.h>
 #include "myBoard.h"
 
@@ -12,7 +21,7 @@
 #define WRITE_DISPLAY_EVERY 250
 
 /*-----( Declare constants )-----*/
-
+const float defaultPressure = 1013.25;
 
 /*-----( Declare objects )-----*/
 struct temperatureSensor {
@@ -21,6 +30,10 @@ struct temperatureSensor {
   TToABV tToABV; 				// Instance or ToToAVB.h
   int state;        				// Input for calculating LIQUID or VAPOR ABV
 };
+
+#ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
+Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(BMP180_ID); // BMP180 pressure sensor
+#endif
 
 /*-----( Declare variables )-----*/
 // Declare array of sensors
@@ -34,11 +47,10 @@ unsigned long lastDisplayWrite;
 
 void setup() {
 
-  int sensorID;
-
   Serial.begin(115200);
 
   // Initialise non-looping temperature sensor values
+  int sensorID; // Manually change for each sensor added
   // Column sensor
   sensorID = 0;
   temperatureSensors[sensorID].sensorName = "Column";
@@ -66,7 +78,10 @@ void setup() {
     }
   }
 
-  //Initialise asynchronous function variables
+  // Initialise pressure sensor
+  initPressureSensors();
+
+  // Initialise asynchronous function variables
   unsigned long now = millis();
   lastTemperatureRead = now;
   lastPressureRead = now;
@@ -101,12 +116,36 @@ void readTemperatatureSensors() {
 
 }
 
+void initPressureSensors() {
+
+  // Set pressure for each temperature sensor to default pressure
+  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+    temperatureSensors[i].tToABV.Pressure(defaultPressure);
+  }
+
+#ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
+  if (!bmp.begin()) {
+    // There was a problem detecting the BMP085 ... check your connections
+    serialDivider();
+    Serial.println("No BMP085 detected ... Check your wiring or I2C ADDR!");
+    serialDivider();
+  }
+#endif
+
+}
+
 void readPressureSensors() {
 
-  // Set pressure for each temperature sensor to default 1013.25mbars
-  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
-    temperatureSensors[i].tToABV.Pressure(1013.25);
+#ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
+  sensors_event_t event;
+
+  bmp.getEvent(&event);
+  if (event.pressure) {
+    for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+      temperatureSensors[i].tToABV.Pressure(event.pressure);
+    }
   }
+#endif
 
 }
 
@@ -154,8 +193,8 @@ void writeSerial() {
 }
 
 void serialDivider() {
-	
-  Serial.println("/-------------------------------------/");
-  
+
+  Serial.println("---------------------------------------");
+
 }
 
