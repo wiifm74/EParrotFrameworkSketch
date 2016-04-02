@@ -3,6 +3,7 @@
 
 // Adafruit BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
+1.#include <Wire.h>
 #include <Adafruit_Sensor.h>            // https://github.com/adafruit/Adafruit_Sensor
 #include <Adafruit_BMP085_U.h>          // https://github.com/adafruit/Adafruit-BMP085-Library
 #endif
