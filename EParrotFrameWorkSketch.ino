@@ -1,6 +1,10 @@
 /*-----( Feature Definitions )-----*/
 //#define FEATURE_ENABLED_ADAFRUIT_BMP180
 //#define FEATURE_ENABLED_SPARKFUN_BMP180
+#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+
+#include <TToABV.h>
+#include "myBoard.h"
 
 // Adafruit BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
@@ -15,13 +19,19 @@
 #include <SFE_BMP180.h>			// https://github.com/sparkfun/BMP180_Breakout
 #endif
 
-#include <TToABV.h>
-#include "myBoard.h"
+// DS18B20 temperature sensor library
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+#include <OneWire.h>			// https://github.com/bigjosh/OneWireNoResistor
+#include <DallasTemperature.h>		// https://github.com/milesburton/Arduino-Temperature-Control-Library
+#endif
 
 /*-----( Definitions )-----*/
 #define LIQUID 1
 #define VAPOR 2
 #define TOTAL_TEMPERATURE_SENSORS 2
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+#define TEMPERATURE_PRECISION 12
+#endif
 
 #define READ_TEMPERATURE_SENSORS_EVERY 400
 #define READ_PRESSURE_SENSORS_EVERY 300000
@@ -33,7 +43,9 @@ const float defaultPressure = 1013.25;
 
 /*-----( Declare objects )-----*/
 struct temperatureSensor {
-  //temperatureSensorClassObject sensor;	// Declare sensor object here e.g. DS18B20 or SMT172 or PT-100
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+  DeviceAddress address;	//DS18B20 sensor address
+#endif
   String sensorName;				// Sensor Name
   TToABV tToABV; 				// Instance or ToToAVB.h
   int state;        				// Input for calculating LIQUID or VAPOR ABV
@@ -46,6 +58,11 @@ Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085); // BMP180 pressure
 // Sparkfun BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_SPARKFUN_BMP180
 SFE_BMP180 bmp;  // BMP180 pressure sensor
+#endif
+
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 #endif
 
 /*-----( Declare variables )-----*/
@@ -64,33 +81,28 @@ void setup() {
 
   // Initialise non-looping temperature sensor values
   int sensorID; // Manually change for each sensor added
+
   // Column sensor
   sensorID = 0;
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+  DeviceAddress columnAddress = { 0x28, 0x33, 0x47, 0x1E, 0x07, 0x00, 0x00, 0x45 }; // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
+  memcpy(temperatureSensors[sensorID].address, columnAddress,8);
+#endif
   temperatureSensors[sensorID].sensorName = "Column";
   temperatureSensors[sensorID].state = VAPOR;
+
   // Boiler sensor
   sensorID = 1;
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+  DeviceAddress boilerAddress = { 0x28, 0xE3, 0xD7, 0x1D, 0x07, 0x00, 0x00, 0xBE }; // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
+  memcpy(temperatureSensors[sensorID].address, boilerAddress,8);
+#endif
   temperatureSensors[sensorID].sensorName = "Boiler";
   temperatureSensors[sensorID].state = LIQUID;
 
-  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
-    // Initialise looping/repeated temperature sensor values
 
-    // set tToABV object to calculate correct ABV values
-    switch (temperatureSensors[i].state) {
-      case VAPOR:
-        temperatureSensors[1].tToABV.Vapor();
-        break;
-      case LIQUID:
-        temperatureSensors[1].tToABV.Liquid();
-        break;
-      default:
-        // something is wrong, set to vapor
-        temperatureSensors[1].tToABV.Vapor();
-        break;
-    }
-  }
-
+  // Initialise temperature sensors
+  initTemperatureSensors();
   // Initialise pressure sensor
   initPressureSensors();
 
@@ -103,18 +115,18 @@ void setup() {
 
 }
 
-void doFunctionAtInterval(void (*callBackFunction)(), unsigned long *lastEvent, unsigned long Interval) {
+  void doFunctionAtInterval(void (*callBackFunction)(), unsigned long *lastEvent, unsigned long Interval) {
 
   unsigned long now = millis();
 
   if ((now - *lastEvent) >= Interval) {
-    callBackFunction();
-    *lastEvent = now;
-  }
+  callBackFunction();
+  *lastEvent = now;
+}
 
 }
 
-void loop() {
+  void loop() {
 
   doFunctionAtInterval(readTemperatureSensors, &lastTemperatureRead, READ_TEMPERATURE_SENSORS_EVERY);  // read temperature sensors
   doFunctionAtInterval(readPressureSensors, &lastPressureRead, READ_PRESSURE_SENSORS_EVERY);  // read pressure sensors
@@ -123,42 +135,80 @@ void loop() {
 
 }
 
+  void initTemperatureSensors() {
+
+  // Initialise temperature sensors
+
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+  sensors.begin();
+#endif
+
+  	for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+  	// Initialise looping/repeated temperature sensor values
+
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+		//Set temperature resolution
+  		sensors.setResolution(temperatureSensors[i].address, TEMPERATURE_PRECISION);
+#endif
+
+		// set tToABV object to calculate correct ABV values
+  		switch (temperatureSensors[i].state) {
+  			case VAPOR:
+  				temperatureSensors[1].tToABV.Vapor();
+  				break;
+  			case LIQUID:
+  				temperatureSensors[1].tToABV.Liquid();
+  				break;
+  			default:
+  				// something is wrong, set to vapor
+  				temperatureSensors[1].tToABV.Vapor();
+  			break;
+  		}
+	}
+}
+
 void readTemperatureSensors() {
 
   // Read temperature sensor values
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+  sensors.requestTemperatures();
+  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+  temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address));
+}
+#endif
 
 }
 
-void initPressureSensors() {
+  void initPressureSensors() {
 
   // Set pressure for each temperature sensor to default pressure
   for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
-    temperatureSensors[i].tToABV.Pressure(defaultPressure);
-  }
+  temperatureSensors[i].tToABV.Pressure(defaultPressure);
+}
 
 #if (defined(FEATURE_ENABLED_ADAFRUIT_BMP180) || defined(FEATURE_ENABLED_SPARKFUN_BMP180))
   if (!bmp.begin()) {
-    // There was a problem detecting the BMP180 ... check your connections
-    serialDivider();
-    Serial.println("No BMP180 detected ... Check your wiring or I2C ADDR!");
-    serialDivider();
-  } else readPressureSensors();
+  // There was a problem detecting the BMP180 ... check your connections
+  serialDivider();
+  Serial.println("No BMP180 detected ... Check your wiring or I2C ADDR!");
+  serialDivider();
+} else readPressureSensors();
 
 #endif
 
 }
 
-void readPressureSensors() {
+  void readPressureSensors() {
 
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
   sensors_event_t event;
 
   bmp.getEvent(&event);
   if (event.pressure) {
-    for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
-      temperatureSensors[i].tToABV.Pressure(event.pressure);
-    }
-  }
+  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+  temperatureSensors[i].tToABV.Pressure(event.pressure);
+}
+}
 #endif
 
 #ifdef FEATURE_ENABLED_SPARKFUN_BMP180
@@ -174,59 +224,59 @@ void readPressureSensors() {
   status = bmp.startTemperature();
   if (status != 0)
   {
-    // Wait for the measurement to complete:
-    delay(status);
+  // Wait for the measurement to complete:
+  delay(status);
 
-    // Retrieve the completed temperature measurement:
-    // Note that the measurement is stored in the variable T.
-    // Function returns 1 if successful, 0 if failure.
+  // Retrieve the completed temperature measurement:
+  // Note that the measurement is stored in the variable T.
+  // Function returns 1 if successful, 0 if failure.
 
-    status = bmp.getTemperature(T);
-    if (status != 0)
-    {
-      // Start a pressure measurement:
-      // The parameter is the oversampling setting, from 0 to 3 (highest res, longest wait).
-      // If request is successful, the number of ms to wait is returned.
-      // If request is unsuccessful, 0 is returned.
+  status = bmp.getTemperature(T);
+  if (status != 0)
+  {
+  // Start a pressure measurement:
+  // The parameter is the oversampling setting, from 0 to 3 (highest res, longest wait).
+  // If request is successful, the number of ms to wait is returned.
+  // If request is unsuccessful, 0 is returned.
 
-      status = bmp.startPressure(3);
-      if (status != 0)
-      {
-        // Wait for the measurement to complete:
-        delay(status);
+  status = bmp.startPressure(3);
+  if (status != 0)
+  {
+  // Wait for the measurement to complete:
+  delay(status);
 
-        // Retrieve the completed pressure measurement:
-        // Note that the measurement is stored in the variable P.
-        // Note also that the function requires the previous temperature measurement (T).
-        // Function returns 1 if successful, 0 if failure.
+  // Retrieve the completed pressure measurement:
+  // Note that the measurement is stored in the variable P.
+  // Note also that the function requires the previous temperature measurement (T).
+  // Function returns 1 if successful, 0 if failure.
 
-        status = bmp.getPressure(P, T);
-        if (status != 0)
-        {
-          // Success - do loop here
-          for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
-            temperatureSensors[i].tToABV.Pressure(P);
-          }
-        }
-        else Serial.println("error retrieving pressure measurement\n");
-      }
-      else Serial.println("error starting pressure measurement\n");
-    }
-    else Serial.println("error retrieving temperature measurement\n");
-  }
+  status = bmp.getPressure(P, T);
+  if (status != 0)
+  {
+  // Success - do loop here
+  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+  temperatureSensors[i].tToABV.Pressure(P);
+}
+}
+  else Serial.println("error retrieving pressure measurement\n");
+}
+  else Serial.println("error starting pressure measurement\n");
+}
+  else Serial.println("error retrieving temperature measurement\n");
+}
   else Serial.println("error starting temperature measurement\n");
 
 #endif
 
 }
 
-void readUserInput() {
+  void readUserInput() {
 
   // Read user input
 
 }
 
-void introDisplay() {
+  void introDisplay() {
 
   // write introduction to serial
   introSerial();
@@ -235,7 +285,7 @@ void introDisplay() {
 
 }
 
-void writeDisplay() {
+  void writeDisplay() {
 
   // write values to Serial
   writeSerial();
@@ -244,27 +294,28 @@ void writeDisplay() {
 
 }
 
-void introSerial() {
+  void introSerial() {
 
   Serial.println("Vision Stills e-Parrot Framework Sketch");
   serialDivider();
 
 }
 
-void writeSerial() {
+  void writeSerial() {
 
   for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
-    Serial.println(temperatureSensors[i].sensorName);
-    Serial.print("Temperature: "); Serial.print(temperatureSensors[i].tToABV.Temperature(), 2); Serial.println("c");
-    Serial.print("Pressure: "); Serial.print(temperatureSensors[i].tToABV.Pressure(), 2);  Serial.println("mbar");
-    Serial.print("ABV: "); Serial.print(temperatureSensors[i].tToABV.ABV(), 2); Serial.println("%");
-    serialDivider();
-  }
+  Serial.println(temperatureSensors[i].sensorName);
+  Serial.print("Temperature: "); Serial.print(temperatureSensors[i].tToABV.Temperature(), 2); Serial.println("c");
+  Serial.print("Pressure: "); Serial.print(temperatureSensors[i].tToABV.Pressure(), 2);  Serial.println("mbar");
+  Serial.print("ABV: "); Serial.print(temperatureSensors[i].tToABV.ABV(), 2); Serial.println("%");
+  serialDivider();
+}
 
 }
 
-void serialDivider() {
+  void serialDivider() {
 
   Serial.println("---------------------------------------");
 
 }
+
