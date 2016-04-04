@@ -1,11 +1,18 @@
 /*-----( Feature Definitions )-----*/
 //#define FEATURE_ENABLED_ADAFRUIT_BMP180
+#define FEATURE_ENABLED_SPARKFUN_BMP180
 
 // Adafruit BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
-1.#include <Wire.h>
+#include <Wire.h>
 #include <Adafruit_Sensor.h>            // https://github.com/adafruit/Adafruit_Sensor
 #include <Adafruit_BMP085_U.h>          // https://github.com/adafruit/Adafruit-BMP085-Library
+#endif
+
+// Sparkfun BMP180 pressure sensor library
+#ifdef FEATURE_ENABLED_SPARKFUN_BMP180
+#include <Wire.h>
+#include <SFE_BMP180.h>			// https://github.com/sparkfun/BMP180_Breakout
 #endif
 
 #include <TToABV.h>
@@ -33,7 +40,12 @@ struct temperatureSensor {
 };
 
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
-Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(BMP180_ID); // BMP180 pressure sensor
+Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085); // BMP180 pressure sensor
+#endif
+
+// Sparkfun BMP180 pressure sensor library
+#ifdef FEATURE_ENABLED_SPARKFUN_BMP180
+SFE_BMP180 bmp;  // BMP180 pressure sensor
 #endif
 
 /*-----( Declare variables )-----*/
@@ -104,14 +116,14 @@ void doFunctionAtInterval(void (*callBackFunction)(), unsigned long *lastEvent, 
 
 void loop() {
 
-  doFunctionAtInterval(readTemperatatureSensors, &lastTemperatureRead, READ_TEMPERATURE_SENSORS_EVERY);  // read temperature sensors
-  doFunctionAtInterval(readPressureSensors, &lastTemperatureRead, READ_PRESSURE_SENSORS_EVERY);  // read pressure sensors
-  doFunctionAtInterval(readUserInput, &lastTemperatureRead, READ_USER_INPUT_EVERY);  // read user input
+  doFunctionAtInterval(readTemperatureSensors, &lastTemperatureRead, READ_TEMPERATURE_SENSORS_EVERY);  // read temperature sensors
+  doFunctionAtInterval(readPressureSensors, &lastPressureRead, READ_PRESSURE_SENSORS_EVERY);  // read pressure sensors
+  doFunctionAtInterval(readUserInput, &lastUserInput, READ_USER_INPUT_EVERY);  // read user input
   doFunctionAtInterval(writeDisplay, &lastDisplayWrite, WRITE_DISPLAY_EVERY);  // write values to display
 
 }
 
-void readTemperatatureSensors() {
+void readTemperatureSensors() {
 
   // Read temperature sensor values
 
@@ -124,13 +136,14 @@ void initPressureSensors() {
     temperatureSensors[i].tToABV.Pressure(defaultPressure);
   }
 
-#ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
+#if (defined(FEATURE_ENABLED_ADAFRUIT_BMP180) || defined(FEATURE_ENABLED_SPARKFUN_BMP180))
   if (!bmp.begin()) {
-    // There was a problem detecting the BMP085 ... check your connections
+    // There was a problem detecting the BMP180 ... check your connections
     serialDivider();
-    Serial.println("No BMP085 detected ... Check your wiring or I2C ADDR!");
+    Serial.println("No BMP180 detected ... Check your wiring or I2C ADDR!");
     serialDivider();
-  }
+  } else readPressureSensors();
+
 #endif
 
 }
@@ -146,6 +159,63 @@ void readPressureSensors() {
       temperatureSensors[i].tToABV.Pressure(event.pressure);
     }
   }
+#endif
+
+#ifdef FEATURE_ENABLED_SPARKFUN_BMP180
+  char status;
+  double T, P, p0, a;
+
+  // You must first get a temperature measurement to perform a pressure reading.
+
+  // Start a temperature measurement:
+  // If request is successful, the number of ms to wait is returned.
+  // If request is unsuccessful, 0 is returned.
+
+  status = bmp.startTemperature();
+  if (status != 0)
+  {
+    // Wait for the measurement to complete:
+    delay(status);
+
+    // Retrieve the completed temperature measurement:
+    // Note that the measurement is stored in the variable T.
+    // Function returns 1 if successful, 0 if failure.
+
+    status = bmp.getTemperature(T);
+    if (status != 0)
+    {
+      // Start a pressure measurement:
+      // The parameter is the oversampling setting, from 0 to 3 (highest res, longest wait).
+      // If request is successful, the number of ms to wait is returned.
+      // If request is unsuccessful, 0 is returned.
+
+      status = bmp.startPressure(3);
+      if (status != 0)
+      {
+        // Wait for the measurement to complete:
+        delay(status);
+
+        // Retrieve the completed pressure measurement:
+        // Note that the measurement is stored in the variable P.
+        // Note also that the function requires the previous temperature measurement (T).
+        // Function returns 1 if successful, 0 if failure.
+
+        status = bmp.getPressure(P, T);
+        if (status != 0)
+        {
+          // Success - do loop here
+          for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+            temperatureSensors[i].tToABV.Pressure(P);
+          }
+        }
+        else Serial.println("error retrieving pressure measurement\n");
+      }
+      else Serial.println("error starting pressure measurement\n");
+    }
+    else Serial.println("error retrieving temperature measurement\n");
+  }
+  else Serial.println("error starting temperature measurement\n");
+
 #endif
 
 }
