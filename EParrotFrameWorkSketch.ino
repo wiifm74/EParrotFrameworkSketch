@@ -3,7 +3,7 @@
 
 // Adafruit BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
-1.#include <Wire.h>
+#include <Wire.h>
 #include <Adafruit_Sensor.h>            // https://github.com/adafruit/Adafruit_Sensor
 #include <Adafruit_BMP085_U.h>          // https://github.com/adafruit/Adafruit-BMP085-Library
 #endif
@@ -33,7 +33,7 @@ struct temperatureSensor {
 };
 
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
-Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(BMP180_ID); // BMP180 pressure sensor
+Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085); // BMP180 pressure sensor
 #endif
 
 /*-----( Declare variables )-----*/
@@ -104,14 +104,14 @@ void doFunctionAtInterval(void (*callBackFunction)(), unsigned long *lastEvent, 
 
 void loop() {
 
-  doFunctionAtInterval(readTemperatatureSensors, &lastTemperatureRead, READ_TEMPERATURE_SENSORS_EVERY);  // read temperature sensors
-  doFunctionAtInterval(readPressureSensors, &lastTemperatureRead, READ_PRESSURE_SENSORS_EVERY);  // read pressure sensors
-  doFunctionAtInterval(readUserInput, &lastTemperatureRead, READ_USER_INPUT_EVERY);  // read user input
+  doFunctionAtInterval(readTemperatureSensors, &lastTemperatureRead, READ_TEMPERATURE_SENSORS_EVERY);  // read temperature sensors
+  doFunctionAtInterval(readPressureSensors, &lastPressureRead, READ_PRESSURE_SENSORS_EVERY);  // read pressure sensors
+  doFunctionAtInterval(readUserInput, &lastUserInput, READ_USER_INPUT_EVERY);  // read user input
   doFunctionAtInterval(writeDisplay, &lastDisplayWrite, WRITE_DISPLAY_EVERY);  // write values to display
 
 }
 
-void readTemperatatureSensors() {
+void readTemperatureSensors() {
 
   // Read temperature sensor values
 
@@ -126,11 +126,12 @@ void initPressureSensors() {
 
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
   if (!bmp.begin()) {
-    // There was a problem detecting the BMP085 ... check your connections
+    // There was a problem detecting the BMP180 ... check your connections
     serialDivider();
-    Serial.println("No BMP085 detected ... Check your wiring or I2C ADDR!");
+    Serial.println("No BMP180 detected ... Check your wiring or I2C ADDR!");
     serialDivider();
-  }
+  } else readPressureSensors();
+
 #endif
 
 }
