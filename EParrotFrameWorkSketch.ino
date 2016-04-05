@@ -2,21 +2,22 @@
 //#define FEATURE_ENABLED_ADAFRUIT_BMP180
 //#define FEATURE_ENABLED_SPARKFUN_BMP180
 //#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+//#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 
-#include "TToABV.h"
+#include <TToABV.h>			// https://github.com/VisionStills/EParrotFrameworkSketch
 #include "myBoard.h"
 
 // Adafruit BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
-#include <Wire.h>
+#include <Wire.h>			// Included in Arduino
 #include <Adafruit_Sensor.h>            // https://github.com/adafruit/Adafruit_Sensor
 #include <Adafruit_BMP085_U.h>          // https://github.com/adafruit/Adafruit-BMP085-Library
 #endif
 
 // Sparkfun BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_SPARKFUN_BMP180
-#include <Wire.h>
+#include <Wire.h>			// Included in Arduino
 #include <SFE_BMP180.h>			// https://github.com/sparkfun/BMP180_Breakout
 #endif
 
@@ -26,21 +27,27 @@
 #include <DallasTemperature.h>		// https://github.com/milesburton/Arduino-Temperature-Control-Library
 #endif
 
+// SMT172 temperature sensor library
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
+#endif
+
 // Protovoltaics shield with PT-100 sensor library
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
-#include <Wire.h>                       // included in Arduino
+#include <Wire.h>                       // Included in Arduino
 #include <PV_RTD_RS232_RS485_Shield.h>  // http://prods.protovoltaics.com/rtd-rs232-rs485/lib/PV_RTD_RS232_RS485_Shield.zip
 #endif
 
 /*-----( Definitions )-----*/
 #define LIQUID 1
 #define VAPOR 2
+
 #define TOTAL_TEMPERATURE_SENSORS 2
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
 #define TEMPERATURE_PRECISION 12
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
-#define RTD_SENSOR_WIRES 2              // Number of wires on RTD sensors - 2, 3 or 4
+#define RTD_SENSOR_WIRES 3              // Number of wires on RTD sensors - 2, 3 or 4
 #define RTD_DRIVE_CURRENT 0.000250      // Set the RTD drive current to 250uA
 #define RTD_PGA 32                      // A PGA value of 32 will allow measurements up to 463.5 deg C
 #define RTD_SAMPLE_FREQUENCY 20
@@ -57,7 +64,10 @@ const float defaultPressure = 1013.25;
 /*-----( Declare objects )-----*/
 struct temperatureSensor {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-  DeviceAddress address;		//DS18B20 sensor address
+  DeviceAddress address;		// DS18B20 sensor address
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   int rtdChannel;       		// Channel value for RTD shield
@@ -70,8 +80,6 @@ struct temperatureSensor {
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
 Adafruit_BMP085_Unified bmp = Adafruit_BMP085_Unified(10085); // BMP180 pressure sensor
 #endif
-
-// Sparkfun BMP180 pressure sensor library
 #ifdef FEATURE_ENABLED_SPARKFUN_BMP180
 SFE_BMP180 bmp;  // BMP180 pressure sensor
 #endif
@@ -80,7 +88,9 @@ SFE_BMP180 bmp;  // BMP180 pressure sensor
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 #endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 
+#endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 PV_RTD_RS232_RS485 rtds(0x52, 100.0);	// RTD shield with PT-100 sensors
 #endif
@@ -105,8 +115,12 @@ void setup() {
   // Column sensor
   sensorID = 0;
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-  DeviceAddress columnAddress = { 0x28, 0x33, 0x47, 0x1E, 0x07, 0x00, 0x00, 0x45 }; // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
+  // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
+  DeviceAddress columnAddress = { 0x28, 0x33, 0x47, 0x1E, 0x07, 0x00, 0x00, 0x45 };
   memcpy(temperatureSensors[sensorID].address, columnAddress, 8);
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   temperatureSensors[sensorID].rtdChannel = 1;
@@ -117,8 +131,12 @@ void setup() {
   // Boiler sensor
   sensorID = 1;
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-  DeviceAddress boilerAddress = { 0x28, 0xE3, 0xD7, 0x1D, 0x07, 0x00, 0x00, 0xBE }; // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
+  // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
+  DeviceAddress boilerAddress = { 0x28, 0xE3, 0xD7, 0x1D, 0x07, 0x00, 0x00, 0xBE };
   memcpy(temperatureSensors[sensorID].address, boilerAddress, 8);
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   temperatureSensors[sensorID].rtdChannel = 2;
@@ -155,7 +173,7 @@ void doFunctionAtInterval(void (*callBackFunction)(), unsigned long *lastEvent, 
 void loop() {
 
   doFunctionAtInterval(readTemperatureSensors, &lastTemperatureRead, READ_TEMPERATURE_SENSORS_EVERY);  // read temperature sensors
-  doFunctionAtInterval(readPressureSensors, &lastPressureRead, READ_PRESSURE_SENSORS_EVERY);  // read pressure sensors
+  doFunctionAtInterval(readPressureSensors, &lastPressureRead, READ_PRESSURE_SENSORS_EVERY);  	// read pressure sensors
   doFunctionAtInterval(readUserInput, &lastUserInput, READ_USER_INPUT_EVERY);  // read user input
   doFunctionAtInterval(writeDisplay, &lastDisplayWrite, WRITE_DISPLAY_EVERY);  // write values to display
 
@@ -167,7 +185,11 @@ void initTemperatureSensors() {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
   sensors.begin();
 #endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
+#endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+  I2C_RTD_PORTNAME.begin();
   rtds.Disable_All_RTD_Channels();							// Disable all RTD channels
   rtds.Set_RTD_SPS(RTD_SAMPLE_FREQUENCY);						// Slow the shield down
 #endif
@@ -178,6 +200,9 @@ void initTemperatureSensors() {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
     //Set temperature resolution
     sensors.setResolution(temperatureSensors[i].address, TEMPERATURE_PRECISION);
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
     rtds.Enable_RTD_Channel(RTD_SENSOR_WIRES, temperatureSensors[i].rtdChannel);                // Enable the RTD channel for each sensor
@@ -210,10 +235,16 @@ void readTemperatureSensors() {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
   sensors.requestTemperatures();
 #endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
+#endif
 
   for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
     temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address));
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
     temperatureSensors[i].tToABV.Temperature(rtds.Get_RTD_Temperature_degC(RTD_SENSOR_WIRES, temperatureSensors[i].rtdChannel));
