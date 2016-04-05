@@ -2,8 +2,8 @@
 //#define FEATURE_ENABLED_ADAFRUIT_BMP180
 //#define FEATURE_ENABLED_SPARKFUN_BMP180
 //#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-//#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-#define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+//#define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 
 #include <TToABV.h>			// https://github.com/VisionStills/EParrotFrameworkSketch
 #include "myBoard.h"
@@ -29,7 +29,8 @@
 
 // SMT172 temperature sensor library
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-
+#include <SMT172.h>
+//using SMT172;
 #endif
 
 // Protovoltaics shield with PT-100 sensor library
@@ -45,6 +46,12 @@
 #define TOTAL_TEMPERATURE_SENSORS 2
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
 #define TEMPERATURE_PRECISION 12
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+#define SMT172_SELECT 15		// Putting this here for now - it most likely belongs in myBoard.h
+#define BUSY 0
+#define SUCCESS 1
+#define NOT_CONNECTED 2
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 #define RTD_SENSOR_WIRES 3              // Number of wires on RTD sensors - 2, 3 or 4
@@ -67,7 +74,7 @@ struct temperatureSensor {
   DeviceAddress address;		// DS18B20 sensor address
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-
+  int select172;
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   int rtdChannel;       		// Channel value for RTD shield
@@ -120,7 +127,7 @@ void setup() {
   memcpy(temperatureSensors[sensorID].address, columnAddress, 8);
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-
+  temperatureSensors[sensorID].select172 = LOW;
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   temperatureSensors[sensorID].rtdChannel = 1;
@@ -136,7 +143,7 @@ void setup() {
   memcpy(temperatureSensors[sensorID].address, boilerAddress, 8);
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-
+  temperatureSensors[sensorID].select172 = HIGH;
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   temperatureSensors[sensorID].rtdChannel = 2;
@@ -202,7 +209,9 @@ void initTemperatureSensors() {
     sensors.setResolution(temperatureSensors[i].address, TEMPERATURE_PRECISION);
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-
+    // set port 15 as output and low so that the top sensor is connected to pin 4
+    pinMode(SMT172_SELECT, OUTPUT);
+    digitalWrite(SMT172_SELECT, LOW);
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
     rtds.Enable_RTD_Channel(RTD_SENSOR_WIRES, temperatureSensors[i].rtdChannel);                // Enable the RTD channel for each sensor
@@ -244,7 +253,16 @@ void readTemperatureSensors() {
     temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address));
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-
+    digitalWrite(SMT172_SELECT, temperatureSensors[i].select172);
+    SMT172::startTemperature(0.002);
+repeatCase0:
+    switch (SMT172::getStatus()) {
+      case BUSY: goto repeatCase0; // O Dijkstra, be merciful onto me, for I have sinned against you :) and so have I Edwin! :D wiifm
+      case SUCCESS:
+        temperatureSensors[i].tToABV.Temperature(SMT172::getTemperature());
+        break;
+      case NOT_CONNECTED: // Do nothing for now
+    }
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
     temperatureSensors[i].tToABV.Temperature(rtds.Get_RTD_Temperature_degC(RTD_SENSOR_WIRES, temperatureSensors[i].rtdChannel));
@@ -393,4 +411,3 @@ void serialDivider() {
   Serial.println("---------------------------------------");
 
 }
-
