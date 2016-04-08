@@ -5,7 +5,7 @@
 #define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 //#define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 
-#include <TToABV.h>			// https://github.com/VisionStills/EParrotFrameworkSketch
+#include "TToABV.h"			// https://github.com/VisionStills/EParrotFrameworkSketch
 #include "myBoard.h"
 
 // Adafruit BMP180 pressure sensor library
@@ -72,6 +72,7 @@ const float defaultPressure = 1013.25;
 struct temperatureSensor {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
   DeviceAddress address;		// DS18B20 sensor address
+  float temperatureCorrectionCoefficients[5];
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
   int select172;
@@ -125,6 +126,11 @@ void setup() {
   // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
   DeviceAddress columnAddress = { 0x28, 0x33, 0x47, 0x1E, 0x07, 0x00, 0x00, 0x45 };
   memcpy(temperatureSensors[sensorID].address, columnAddress, 8);
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[0] = -0.139408013;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[1] = -0.006497086;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[2] =  0.000239295;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[3] = -2.84829E-06;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[4] =  2.26093E-08;
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
   temperatureSensors[sensorID].select172 = LOW;
@@ -141,6 +147,11 @@ void setup() {
   // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
   DeviceAddress boilerAddress = { 0x28, 0xE3, 0xD7, 0x1D, 0x07, 0x00, 0x00, 0xBE };
   memcpy(temperatureSensors[sensorID].address, boilerAddress, 8);
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[0] = 0;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[1] = 0;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[2] = 0;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[3] = 0;
+  temperatureSensors[sensorID].temperatureCorrectionCoefficients[4] = 0;
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
   temperatureSensors[sensorID].select172 = HIGH;
@@ -250,7 +261,7 @@ void readTemperatureSensors() {
 
   for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-    temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address));
+    temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address) - calculatePolynomial(temperatureSensors[i].temperatureCorrectionCoefficientsVapor, sensors.getTempC(temperatureSensors[i].address)));
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
     digitalWrite(SMT172_SELECT, temperatureSensors[i].select172);
@@ -269,6 +280,17 @@ repeatCase0:
 #endif
   }
 
+}
+
+float calculatePolynomial(float* coefficients, float T) {
+  
+  float calculatedValue = 0;
+  
+  for (int i = 0; i < 5; i++) {
+    calculatedValue += coefficients[i] * pow(T, i);
+  }
+  return calculatedValue;
+  
 }
 
 void initPressureSensors() {
