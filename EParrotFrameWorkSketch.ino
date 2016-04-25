@@ -5,6 +5,8 @@
 #define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 //#define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 
+#include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
+
 #include "TToABV.h"			// https://github.com/VisionStills/EParrotFrameworkSketch
 #include "myBoard.h"
 
@@ -68,6 +70,9 @@
 /*-----( Declare constants )-----*/
 const float defaultPressure = 1013.25;
 
+const int CONFIG_VERSION = 1;
+const int memoryBase = 32;
+
 /*-----( Declare objects )-----*/
 struct temperatureSensor {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
@@ -102,6 +107,13 @@ DallasTemperature sensors(&oneWire);
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 PV_RTD_RS232_RS485 rtds(0x52, 100.0);	// RTD shield with PT-100 sensors
 #endif
+
+struct Settings {
+  int version;
+} settings = {
+  // Place default values for settings here
+  CONFIG_VERSION
+};
 
 /*-----( Declare variables )-----*/
 // Declare array of sensors
@@ -162,7 +174,8 @@ void setup() {
   temperatureSensors[sensorID].sensorName = "Boiler";
   temperatureSensors[sensorID].state = LIQUID;
 
-
+  // Initialise settings
+  initSettings();
   // Initialise temperature sensors
   initTemperatureSensors();
   // Initialise pressure sensor
@@ -194,6 +207,25 @@ void loop() {
   doFunctionAtInterval(readPressureSensors, &lastPressureRead, READ_PRESSURE_SENSORS_EVERY);  	// read pressure sensors
   doFunctionAtInterval(readUserInput, &lastUserInput, READ_USER_INPUT_EVERY);  // read user input
   doFunctionAtInterval(writeDisplay, &lastDisplayWrite, WRITE_DISPLAY_EVERY);  // write values to display
+
+}
+
+void initSettings() {
+
+  EEPROM.setMemPool(memoryBase, EEPROMSizeUno);
+  configAddress = EEPROM.getAddress(sizeof(Settings));
+  EEPROM.readBlock(configAddress, settings);
+
+  if (settings.version != CONFIG_VERSION) {
+    // Settings have not been saved before or settings configuration has changed
+    EEPROM.writeBlock(configAddress, settings);
+  }
+
+}
+
+void updateSettings() {
+  
+  EEPROM.updateBlock(configAddress, settings);
 
 }
 
@@ -273,6 +305,7 @@ repeatCase0:
         temperatureSensors[i].tToABV.Temperature(SMT172::getTemperature());
         break;
       case NOT_CONNECTED: // Do nothing for now
+        break;
     }
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
@@ -283,14 +316,14 @@ repeatCase0:
 }
 
 float calculatePolynomial(float* coefficients, float T) {
-  
+
   float calculatedValue = 0;
-  
+
   for (int i = 0; i < 5; i++) {
     calculatedValue += coefficients[i] * pow(T, i);
   }
   return calculatedValue;
-  
+
 }
 
 void initPressureSensors() {
