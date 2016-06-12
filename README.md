@@ -5,11 +5,23 @@ Framework Arduino sketch for Vision Stills e-Parrot projects
 ## Explanation
 A framework sketch to begin e-Parrot Arduino projects.
 ### Hardware Currently Supported
+
 #### Pressure Sensors
-No pressure sensor - pressure defaults to 1013.25hPa
-BMP180 pressure sensor
+##### No pressure sensor
+Pressure defaults to 1013.25hPa
+##### BMP180 pressure sensor
+Support for Sparkfun BMP180 Library or Adafruit BMP180 Library
+
 #### Temperature Sensors
-Maxim Integrated DS18B20
+##### Maxim Integrated DS18B20
+##### SMT172 Sensor
+##### Protovoltaics Shield with Pt-100 Sensors
+
+#### Displays
+##### Serial Display
+
+### Framework for EEPROM Storage of Settings
+
 ## Install
 
 ## Usage
