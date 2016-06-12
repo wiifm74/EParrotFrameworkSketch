@@ -7,7 +7,7 @@
 
 #include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
 
-#include "TToABV.h"			// https://github.com/VisionStills/EParrotFrameworkSketch
+#include "TToABV.h"			// https://github.com/VisionStills/TemperatureToABV
 #include "myBoard.h"
 
 // Adafruit BMP180 pressure sensor library
