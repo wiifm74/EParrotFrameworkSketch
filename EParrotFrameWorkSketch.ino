@@ -119,6 +119,8 @@ struct Settings {
 // Declare array of sensors
 temperatureSensor temperatureSensors[TOTAL_TEMPERATURE_SENSORS];
 
+int configAddress;
+
 //Declare asynchronous function last event times
 unsigned long lastTemperatureRead;
 unsigned long lastPressureRead;
@@ -212,7 +214,7 @@ void loop() {
 
 void initSettings() {
 
-  EEPROM.setMemPool(memoryBase, EEPROMSizeUno);
+  EEPROM.setMemPool(memoryBase, EEPROMSizeMega);
   configAddress = EEPROM.getAddress(sizeof(Settings));
   EEPROM.readBlock(configAddress, settings);
 
@@ -224,7 +226,7 @@ void initSettings() {
 }
 
 void updateSettings() {
-  
+
   EEPROM.updateBlock(configAddress, settings);
 
 }
