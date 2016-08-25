@@ -108,11 +108,20 @@ DallasTemperature sensors(&oneWire);
 PV_RTD_RS232_RS485 rtds(0x52, 100.0);	// RTD shield with PT-100 sensors
 #endif
 
+struct Setting {
+	String name;
+	float value;
+};
+
 struct Settings {
   int version;
+  Setting alarms[5];
+  Setting setPoints[3];
 } settings = {
   // Place default values for settings here
-  CONFIG_VERSION
+  CONFIG_VERSION,
+  { (Setting){ "Boiler Pressure", 1.25 }, (Setting){ "Boiler Temp", 25 }, (Setting){ "P Condensor", 25 }, (Setting){ "Deflag", 25 }, (Setting){ "Vapour Escape", 25 } },
+  { (Setting){ "Warm Up 1", 20 }, (Setting){ "Warm Up 2", 22 }, (Setting){ "Warm Up 3", 22 } }
 };
 
 /*-----( Declare variables )-----*/
