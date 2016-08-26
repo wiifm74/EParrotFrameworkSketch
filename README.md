@@ -83,12 +83,12 @@ Column
 Temperature: 0.00c
 Pressure: 1013.25hPa
 ABV: -7818.00%
----------------------------------------
+
 Boiler
 Temperature: 0.00c
 Pressure: 1013.25hPa
 ABV: -7818.00%
----------------------------------------
+
 
 
 ## License
