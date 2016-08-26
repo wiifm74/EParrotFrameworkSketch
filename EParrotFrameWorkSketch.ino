@@ -1,9 +1,12 @@
 /*-----( Feature Definitions )-----*/
+
 //#define FEATURE_ENABLED_ADAFRUIT_BMP180
 //#define FEATURE_ENABLED_SPARKFUN_BMP180
 //#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
 //#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+#define FEATURE_ENABLED_NEXTION_DISPLAY
+//#define FEATURE_ENABLED_BENCH_TESTING
 
 #include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
 #include "TToABV.h"			// https://github.com/VisionStills/TemperatureToABV
@@ -40,6 +43,14 @@
 #include <PV_RTD_RS232_RS485_Shield.h>  // http://prods.protovoltaics.com/rtd-rs232-rs485/lib/PV_RTD_RS232_RS485_Shield.zip
 #endif
 
+#ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+#include "Nextion.h"
+#endif
+
+#ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+
+#endif
+
 /*-----( Definitions )-----*/
 #define LIQUID 1
 #define VAPOR 2
@@ -68,12 +79,12 @@
 #define READ_TEMPERATURE_SENSORS_EVERY 400
 #define READ_PRESSURE_SENSORS_EVERY 300000
 #define READ_USER_INPUT_EVERY 20
-#define WRITE_DISPLAY_EVERY 250
+#define WRITE_DISPLAY_EVERY 2000
 
 /*-----( Declare constants )-----*/
 const float defaultPressure = 1013.25;
 
-const int CONFIG_VERSION = 1.0;
+const int CONFIG_VERSION = 0.2;
 const int memoryBase = 32;
 
 /*-----( Declare objects )-----*/
@@ -87,7 +98,7 @@ struct TemperatureSensor {
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   int rtdChannel;       		// Channel value for RTD shield
 #endif
-  String sensorName;			// Sensor Name
+  char* sensorName;			// Sensor Name
   TToABV tToABV; 			// Instance or ToToAVB.h
   int state;        			// Input for calculating LIQUID or VAPOR ABV
 };
@@ -108,6 +119,23 @@ DallasTemperature sensors(&oneWire);
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 PV_RTD_RS232_RS485 rtds(0x52, 100.0);	// RTD shield with PT-100 sensors
+#endif
+
+#ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+NexPage pABV    = NexPage(0, 0, "pABV");
+NexText tPageName = NexText(0, 5, "tPageName");
+NexText tSensorName = NexText(0, 5, "tSensorName");
+NexNumber nABVInteger = NexNumber(0, 8, "nABVInteger");
+NexNumber nABVDecimal = NexNumber(0, 9, "nABVDecimal");
+NexHotspot mABVPrevious = NexHotspot(0, 3, "mPrevious");
+NexHotspot mABVNext = NexHotspot(0, 4, "mNex");
+
+NexTouch *nex_listen_list[] =
+{
+  &mABVPrevious,
+  &mABVNext,
+  NULL
+};
 #endif
 
 struct Settings {
@@ -144,12 +172,16 @@ struct Settings {
   }
 };
 
-
-/*-----( Declare variables )-----*/
-// Declare array of sensors
 TemperatureSensor temperatureSensors[MAXIMUM_TEMPERATURE_SENSORS];
 
+/*-----( Declare variables )-----*/
 int configAddress;
+
+bool newDisplayPage = true;
+bool newDisplayFixed = true;
+int currentDisplayPage = 0;
+int currentDisplaySensor = 0;
+char buffer[100] = {0};
 
 //Declare asynchronous function last event times
 unsigned long lastTemperatureRead;
@@ -167,6 +199,8 @@ void setup() {
   initTemperatureSensors();
   // Initialise pressure sensor
   initPressureSensors();
+  //Initialise display
+  initDisplay();
 
   // Initialise asynchronous function variables
   unsigned long now = millis();
@@ -194,12 +228,13 @@ void loop() {
   doFunctionAtInterval(readPressureSensors, &lastPressureRead, READ_PRESSURE_SENSORS_EVERY);  	// read pressure sensors
   doFunctionAtInterval(readUserInput, &lastUserInput, READ_USER_INPUT_EVERY);  // read user input
   doFunctionAtInterval(writeDisplay, &lastDisplayWrite, WRITE_DISPLAY_EVERY);  // write values to display
-
+  nexLoop(nex_listen_list);
 }
 
 void initSettings() {
 
   Settings tempSettings;
+
   waitForEEPROM();
   EEPROM.setMemPool(memoryBase, EEPROMSizeMega);
   waitForEEPROM();
@@ -207,16 +242,21 @@ void initSettings() {
   waitForEEPROM();
   EEPROM.readBlock(configAddress, tempSettings);
   waitForEEPROM();
+
   if (tempSettings.version != CONFIG_VERSION) {
     // Settings have not been saved before or settings configuration has changed
+    waitForEEPROM();
     EEPROM.writeBlock(configAddress, settings);
+    waitForEEPROM();
   }
-  waitForEEPROM();
+
   EEPROM.readBlock(configAddress, settings);
   waitForEEPROM();
+
 }
 
 void updateSettings() {
+
   waitForEEPROM();
   EEPROM.updateBlock(configAddress, settings);
   waitForEEPROM();
@@ -230,8 +270,11 @@ void initTemperatureSensors() {
     memcpy(temperatureSensors[i].address, settings.sensors[i].address, sizeof(DeviceAddress) / sizeof(uint8_t));
 <<<<<<< HEAD
 =======
+<<<<<<< HEAD
+=======
     //memcpy(temperatureSensors[i].coefficients, settings.sensors[i].coefficients, 5);
 >>>>>>> refs/remotes/origin/master
+>>>>>>> master
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
     temperatureSensors[i].select172 = settings.sensors[i].select172;
@@ -456,11 +499,20 @@ void readUserInput() {
 
 }
 
+void initDisplay() {
+#ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+  nexInit();
+  mABVPrevious.attachPop(mPopABVPrevious, &mABVPrevious);
+  mABVNext.attachPop(mPopABVNext, &mABVNext);
+#endif
+}
+
 void introDisplay() {
 
   // write introduction to serial
+#ifdef FEATURE_ENABLED_SERIAL_DISPLAY
   introSerial();
-
+#endif
   //write introduction to display
 
 }
@@ -468,10 +520,45 @@ void introDisplay() {
 void writeDisplay() {
 
   // write values to Serial
+#ifdef FEATURE_ENABLED_SERIAL_DISPLAY
   writeSerial();
+#endif
 
   // write values to display
+  if (newDisplayPage) {
+    newDisplayPage = false;
+    //write page here
+    switch (currentDisplayPage) {
+      case 0:
+        pABV.show();
+        tPageName.setText("Alcohol by Volume");
+        break;
+      default:
+        pABV.show();
+        tPageName.setText("Alcohol by Volume");
+        break;
+    }
+  }
 
+  // write fixed values
+  if (newDisplayFixed) {
+    newDisplayFixed = false;
+    tSensorName.setText(settings.sensors[currentDisplaySensor].sensorName);
+  }
+
+  //write dynamic values
+  double param, intpart, fractpart;
+  param = (double) temperatureSensors[currentDisplaySensor].tToABV.ABV();
+#ifdef FEATURE_ENABLED_BENCH_TESTING
+  Serial.println("Bench testing mode!");
+  param = (double) temperatureSensors[currentDisplaySensor].tToABV.Temperature();
+#endif
+  if (param < 0) {
+    param = 0.0;
+  }
+  fractpart = modf(param, &intpart);
+  nABVInteger.setValue( (int) intpart);
+  nABVDecimal.setValue( (int) round( fractpart * 10 ) );
 }
 
 void introSerial() {
@@ -498,6 +585,27 @@ void serialDivider() {
   Serial.println("---------------------------------------");
 
 }
+
+#ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+void mPopABVPrevious(void *ptr)
+{
+
+  if (currentDisplaySensor > 0) {
+    currentDisplaySensor--;
+    newDisplayFixed = true;
+  }
+}
+
+void mPopABVNext(void *ptr)
+{
+
+  if (currentDisplaySensor < (settings.sensorsUsed - 1) ) {
+    currentDisplaySensor++;
+    newDisplayFixed = true;
+  }
+}
+
+#endif
 
 void waitForEEPROM() {
   while (!EEPROM.isReady()) {
