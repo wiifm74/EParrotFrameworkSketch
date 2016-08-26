@@ -28,14 +28,12 @@ Support for Sparkfun BMP180 Library or Adafruit BMP180 Library
 The idea behind this is that you turn on and off 'features'.
 
 Let's assume:
-[list]
-[li]you are using the Arduino IDE (https://www.arduino.cc/en/Main/Software)[/li]
-[li]you have a Mega2560 Board[/li]
-[li]you have a BMP180 Pressure Sensor[/li]
-[li]you have 2x DS18B20 Temperature Sensors and they are wired to one pin of the board using normal power mode (http://www.tweaking4all.com/wp-content/uploads/2014/03/ds18b20-normal-power.jpg)[/li]
-[li]You know the addresses of your DS18B20 sensors.  If not, go here - [http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual[/li]
-[li]Your board is connected to your computer via USB[/li]
-[/list]
+- you are using the Arduino IDE [https://www.arduino.cc/en/Main/Software](https://www.arduino.cc/en/Main/Software)
+- you have a Mega2560 Board
+- you have a BMP180 Pressure Sensor
+- you have 2x DS18B20 Temperature Sensors and they are wired to one pin of the board using normal power mode [http://www.tweaking4all.com/wp-content/uploads/2014/03/ds18b20-normal-power.jpg](http://www.tweaking4all.com/wp-content/uploads/2014/03/ds18b20-normal-power.jpg)
+- You know the addresses of your DS18B20 sensors.  If not, go here - [http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual](http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual)
+- Your board is connected to your computer via USB
 
 1. Open the sketch
 - Run the Arduino IDE
@@ -53,9 +51,13 @@ to
 [code]#define FEATURE_ENABLED_ADAFRUIT_BMP180[/code]
 
 - To enable the DS18B20 temp sensors, change line 4 from
-[code]//#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR[/code]
+```
+//#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+```
 to
-[code]#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR[/code]
+```
+#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR[/code]
+```
 
 3. Set DS18B20 sensor addresses
 If you don't know your sensor addresses, go here - http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
@@ -78,7 +80,7 @@ In this case, the data wire for your DS18B20 sensors is 57
 - Click 'Tools' > 'Serial Monitor'
 - Ensure you have '115200 baud' selected from the dropdown list in the bottom right hand corner of the serial monitor
 - You should see values outputted to your screen in the format:
-'''
+```
 Column
 Temperature: 0.00c
 Pressure: 1013.25hPa
@@ -89,7 +91,7 @@ Temperature: 0.00c
 Pressure: 1013.25hPa
 ABV: -7818.00%
 ---------------------------------------
-'''
+```
 
 
 ## License
