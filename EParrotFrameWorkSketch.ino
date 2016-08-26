@@ -228,7 +228,10 @@ void initTemperatureSensors() {
   for (int i = 0; i < settings.sensorsUsed; i++) {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
     memcpy(temperatureSensors[i].address, settings.sensors[i].address, sizeof(DeviceAddress) / sizeof(uint8_t));
+<<<<<<< HEAD
+=======
     //memcpy(temperatureSensors[i].coefficients, settings.sensors[i].coefficients, 5);
+>>>>>>> refs/remotes/origin/master
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
     temperatureSensors[i].select172 = settings.sensors[i].select172;
@@ -296,13 +299,15 @@ void readTemperatureSensors() {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
   sensors.requestTemperatures();
 #endif
-#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 
+<<<<<<< HEAD
+=======
 #endif
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 
 #endif
 
+>>>>>>> refs/remotes/origin/master
   for (int i = 0; i < settings.sensorsUsed; i++) {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
 
