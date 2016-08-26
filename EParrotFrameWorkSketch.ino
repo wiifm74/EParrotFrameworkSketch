@@ -2,11 +2,10 @@
 //#define FEATURE_ENABLED_ADAFRUIT_BMP180
 //#define FEATURE_ENABLED_SPARKFUN_BMP180
 //#define FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-//#define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+//#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+#define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 
 #include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
-
 #include "TToABV.h"			// https://github.com/VisionStills/TemperatureToABV
 #include "myBoard.h"
 
@@ -45,17 +44,21 @@
 #define LIQUID 1
 #define VAPOR 2
 
-#define TOTAL_TEMPERATURE_SENSORS 2
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+#define MAXIMUM_TEMPERATURE_SENSORS 10
 #define TEMPERATURE_PRECISION 12
 #endif
+
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+#define MAXIMUM_TEMPERATURE_SENSORS 2
 #define SMT172_SELECT 15		// Putting this here for now - it most likely belongs in myBoard.h
 #define BUSY 0
 #define SUCCESS 1
 #define NOT_CONNECTED 2
 #endif
+
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+#define MAXIMUM_TEMPERATURE_SENSORS 4
 #define RTD_SENSOR_WIRES 3              // Number of wires on RTD sensors - 2, 3 or 4
 #define RTD_DRIVE_CURRENT 0.000250      // Set the RTD drive current to 250uA
 #define RTD_PGA 32                      // A PGA value of 32 will allow measurements up to 463.5 deg C
@@ -70,14 +73,13 @@
 /*-----( Declare constants )-----*/
 const float defaultPressure = 1013.25;
 
-const int CONFIG_VERSION = 1;
+const int CONFIG_VERSION = 1.0;
 const int memoryBase = 32;
 
 /*-----( Declare objects )-----*/
-struct temperatureSensor {
+struct TemperatureSensor {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
   DeviceAddress address;		// DS18B20 sensor address
-  float temperatureCorrectionCoefficients[5];
 #endif
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
   int select172;
@@ -108,25 +110,44 @@ DallasTemperature sensors(&oneWire);
 PV_RTD_RS232_RS485 rtds(0x52, 100.0);	// RTD shield with PT-100 sensors
 #endif
 
-struct Setting {
-	String name;
-	float value;
-};
-
 struct Settings {
   int version;
-  Setting alarms[5];
-  Setting setPoints[3];
+  int sensorsUsed;
+  TemperatureSensor sensors[MAXIMUM_TEMPERATURE_SENSORS];
 } settings = {
   // Place default values for settings here
   CONFIG_VERSION,
-  { (Setting){ "Boiler Pressure", 1.25 }, (Setting){ "Boiler Temp", 25 }, (Setting){ "P Condensor", 25 }, (Setting){ "Deflag", 25 }, (Setting){ "Vapour Escape", 25 } },
-  { (Setting){ "Warm Up 1", 20 }, (Setting){ "Warm Up 2", 22 }, (Setting){ "Warm Up 3", 22 } }
+  2,
+  { (TemperatureSensor) {
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+      { 0x28, 0xE3, 0xD7, 0x1D, 0x07, 0x00, 0x00, 0xBE },
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+      HIGH,
+#endif
+#ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+      1,
+#endif
+      "Boiler", LIQUID
+    }, (TemperatureSensor) {
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+      { 0x28, 0x33, 0x47, 0x1E, 0x07, 0x00, 0x00, 0x45 },
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+      LOW,
+#endif
+#ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+      2,
+#endif
+      "Column", VAPOR
+    }
+  }
 };
+
 
 /*-----( Declare variables )-----*/
 // Declare array of sensors
-temperatureSensor temperatureSensors[TOTAL_TEMPERATURE_SENSORS];
+TemperatureSensor temperatureSensors[MAXIMUM_TEMPERATURE_SENSORS];
 
 int configAddress;
 
@@ -138,52 +159,7 @@ unsigned long lastDisplayWrite;
 
 void setup() {
 
-  Serial.begin(115200);
-
-  // Initialise non-looping temperature sensor values
-  int sensorID; // Manually change for each sensor added
-
-  // Column sensor
-  sensorID = 0;
-#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-  // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
-  DeviceAddress columnAddress = { 0x28, 0x33, 0x47, 0x1E, 0x07, 0x00, 0x00, 0x45 };
-  memcpy(temperatureSensors[sensorID].address, columnAddress, 8);
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[0] = -0.139408013;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[1] = -0.006497086;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[2] =  0.000239295;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[3] = -2.84829E-06;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[4] =  2.26093E-08;
-#endif
-#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-  temperatureSensors[sensorID].select172 = LOW;
-#endif
-#ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
-  temperatureSensors[sensorID].rtdChannel = 1;
-#endif
-  temperatureSensors[sensorID].sensorName = "Column";
-  temperatureSensors[sensorID].state = VAPOR;
-
-  // Boiler sensor
-  sensorID = 1;
-#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-  // See the tutorial on how to obtain these addresses: http://arduino-info.wikispaces.com/Brick-Temperature-DS18B20#Read%20individual
-  DeviceAddress boilerAddress = { 0x28, 0xE3, 0xD7, 0x1D, 0x07, 0x00, 0x00, 0xBE };
-  memcpy(temperatureSensors[sensorID].address, boilerAddress, 8);
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[0] = 0;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[1] = 0;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[2] = 0;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[3] = 0;
-  temperatureSensors[sensorID].temperatureCorrectionCoefficients[4] = 0;
-#endif
-#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
-  temperatureSensors[sensorID].select172 = HIGH;
-#endif
-#ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
-  temperatureSensors[sensorID].rtdChannel = 2;
-#endif
-  temperatureSensors[sensorID].sensorName = "Boiler";
-  temperatureSensors[sensorID].state = LIQUID;
+  Serial.begin(9600);
 
   // Initialise settings
   initSettings();
@@ -223,24 +199,46 @@ void loop() {
 
 void initSettings() {
 
+  Settings tempSettings;
+  waitForEEPROM();
   EEPROM.setMemPool(memoryBase, EEPROMSizeMega);
+  waitForEEPROM();
   configAddress = EEPROM.getAddress(sizeof(Settings));
-  EEPROM.readBlock(configAddress, settings);
-
-  if (settings.version != CONFIG_VERSION) {
+  waitForEEPROM();
+  EEPROM.readBlock(configAddress, tempSettings);
+  waitForEEPROM();
+  if (tempSettings.version != CONFIG_VERSION) {
     // Settings have not been saved before or settings configuration has changed
     EEPROM.writeBlock(configAddress, settings);
   }
-
+  waitForEEPROM();
+  EEPROM.readBlock(configAddress, settings);
+  waitForEEPROM();
 }
 
 void updateSettings() {
-
+  waitForEEPROM();
   EEPROM.updateBlock(configAddress, settings);
+  waitForEEPROM();
 
 }
 
 void initTemperatureSensors() {
+
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+    memcpy(temperatureSensors[i].address, settings.sensors[i].address, sizeof(DeviceAddress) / sizeof(uint8_t));
+    //memcpy(temperatureSensors[i].coefficients, settings.sensors[i].coefficients, 5);
+#endif
+#ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
+    temperatureSensors[i].select172 = settings.sensors[i].select172;
+#endif
+#ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
+    temperatureSensors[i].rtdChannel = settings.sensors[i].rtdChannel;
+#endif
+    temperatureSensors[i].sensorName = settings.sensors[i].sensorName;
+    temperatureSensors[i].state = settings.sensors[i].state;
+  }
 
   // Initialise temperature sensors
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
@@ -255,7 +253,7 @@ void initTemperatureSensors() {
   rtds.Set_RTD_SPS(RTD_SAMPLE_FREQUENCY);						// Slow the shield down
 #endif
 
-  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+  for (int i = 0; i < MAXIMUM_TEMPERATURE_SENSORS; i++) {
     // Initialise looping/repeated temperature sensor values
 
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
@@ -276,14 +274,14 @@ void initTemperatureSensors() {
     // set tToABV object to calculate correct ABV values
     switch (temperatureSensors[i].state) {
       case VAPOR:
-        temperatureSensors[1].tToABV.Vapor();
+        temperatureSensors[i].tToABV.Vapor();
         break;
       case LIQUID:
-        temperatureSensors[1].tToABV.Liquid();
+        temperatureSensors[i].tToABV.Liquid();
         break;
       default:
         // something is wrong, set to vapor
-        temperatureSensors[1].tToABV.Vapor();
+        temperatureSensors[i].tToABV.Vapor();
         break;
     }
   }
@@ -301,11 +299,29 @@ void readTemperatureSensors() {
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 
 #endif
+#ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 
-  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
-#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
-    temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address) - calculatePolynomial(temperatureSensors[i].temperatureCorrectionCoefficientsVapor, sensors.getTempC(temperatureSensors[i].address)));
 #endif
+
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+#ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
+
+    switch (temperatureSensors[i].state) {
+      case LIQUID:
+        {
+          float coefficients[] = { -0.139408013, -0.006497086, 0.000239295, -284829E-06, 2.26093E-08 };
+          temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address) - calculatePolynomial(coefficients, sensors.getTempC(temperatureSensors[i].address)));
+          break;
+        }
+      case VAPOR:
+        {
+          float coefficients[] = { 0, 0, 0, 0, 0 };
+          temperatureSensors[i].tToABV.Temperature(sensors.getTempC(temperatureSensors[i].address) - calculatePolynomial(coefficients, sensors.getTempC(temperatureSensors[i].address)));
+          break;
+        }
+    }
+#endif
+
 #ifdef FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
     digitalWrite(SMT172_SELECT, temperatureSensors[i].select172);
     SMT172::startTemperature(0.002);
@@ -340,7 +356,7 @@ float calculatePolynomial(float* coefficients, float T) {
 void initPressureSensors() {
 
   // Set pressure for each temperature sensor to default pressure
-  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+  for (int i = 0; i < MAXIMUM_TEMPERATURE_SENSORS; i++) {
     temperatureSensors[i].tToABV.Pressure(defaultPressure);
   }
 
@@ -365,7 +381,7 @@ void readPressureSensors() {
 
   bmp.getEvent(&event);
   if (event.pressure) {
-    for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+    for (int i = 0; i < MAXIMUM_TEMPERATURE_SENSORS; i++) {
       temperatureSensors[i].tToABV.Pressure(event.pressure);
     }
   }
@@ -414,7 +430,7 @@ void readPressureSensors() {
         if (status != 0)
         {
           // Success - do loop here
-          for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+          for (int i = 0; i < MAXIMUM_TEMPERATURE_SENSORS; i++) {
             temperatureSensors[i].tToABV.Pressure(P);
           }
         }
@@ -462,7 +478,7 @@ void introSerial() {
 
 void writeSerial() {
 
-  for (int i = 0; i < TOTAL_TEMPERATURE_SENSORS; i++) {
+  for (int i = 0; i < settings.sensorsUsed; i++) {
     Serial.println(temperatureSensors[i].sensorName);
     Serial.print("Temperature: "); Serial.print(temperatureSensors[i].tToABV.Temperature(), 2); Serial.println("c");
     Serial.print("Pressure: "); Serial.print(temperatureSensors[i].tToABV.Pressure(), 2);  Serial.println("hPa");
@@ -477,3 +493,10 @@ void serialDivider() {
   Serial.println("---------------------------------------");
 
 }
+
+void waitForEEPROM() {
+  while (!EEPROM.isReady()) {
+    delay(1);
+  }
+}
+
