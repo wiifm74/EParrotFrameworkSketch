@@ -79,15 +79,15 @@ In this case, the data wire for your DS18B20 sensors is 57
 - Ensure you have '115200 baud' selected from the dropdown list in the bottom right hand corner of the serial monitor
 - You should see values outputted to your screen in the format:
 
-Column
-Temperature: 0.00c
-Pressure: 1013.25hPa
-ABV: -7818.00%
-
-Boiler
-Temperature: 0.00c
-Pressure: 1013.25hPa
-ABV: -7818.00%
+- Column
+- Temperature: 0.00c
+- Pressure: 1013.25hPa
+- ABV: -7818.00%
+-
+- Boiler
+- Temperature: 0.00c
+- Pressure: 1013.25hPa
+- ABV: -7818.00%
 
 
 
