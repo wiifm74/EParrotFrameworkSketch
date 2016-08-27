@@ -1,4 +1,5 @@
 /*-----( Feature Definitions )-----*/
+const int CONFIG_VERSION = 1;
 
 //#define FEATURE_ENABLED_ADAFRUIT_BMP180
 //#define FEATURE_ENABLED_SPARKFUN_BMP180
@@ -6,7 +7,7 @@
 //#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_NEXTION_DISPLAY
-//#define FEATURE_ENABLED_BENCH_TESTING
+#define FEATURE_ENABLED_BENCH_TESTING
 
 #include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
 #include "TToABV.h"			// https://github.com/VisionStills/TemperatureToABV
@@ -81,10 +82,16 @@
 #define READ_USER_INPUT_EVERY 20
 #define WRITE_DISPLAY_EVERY 2000
 
+#ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+#else
+#define dbSerialPrint(a)    Serial.print(a)
+#define dbSerialPrintln(a)  Serial.println(a)
+#define dbSerialBegin(a)    Serial.begin(a)
+#endif
+
 /*-----( Declare constants )-----*/
 const float defaultPressure = 1013.25;
 
-const int CONFIG_VERSION = 0.2;
 const int memoryBase = 32;
 
 /*-----( Declare objects )-----*/
@@ -122,18 +129,20 @@ PV_RTD_RS232_RS485 rtds(0x52, 100.0);	// RTD shield with PT-100 sensors
 #endif
 
 #ifdef FEATURE_ENABLED_NEXTION_DISPLAY
-NexPage pABV    = NexPage(0, 0, "pABV");
-NexText tPageName = NexText(0, 5, "tPageName");
-NexText tSensorName = NexText(0, 5, "tSensorName");
-NexNumber nABVInteger = NexNumber(0, 8, "nABVInteger");
-NexNumber nABVDecimal = NexNumber(0, 9, "nABVDecimal");
-NexHotspot mABVPrevious = NexHotspot(0, 3, "mPrevious");
-NexHotspot mABVNext = NexHotspot(0, 4, "mNex");
+NexPage pSplash = NexPage(0, 0, "pSplash");
+NexPage pABV    = NexPage(1, 0, "pABV");
+NexText tPageName = NexText(1, 1, "tPageName");
+NexText tSensorName = NexText(1, 2, "tSensorName");
+NexNumber nABVInteger = NexNumber(1, 4, "nABVInteger");
+NexNumber nABVDecimal = NexNumber(1, 5, "nABVDecimal");
+NexButton bABVPrevious = NexButton(1, 6, "bPrevious");
+NexButton bABVNext = NexButton(1, 7, "bNext");
 
 NexTouch *nex_listen_list[] =
 {
-  &mABVPrevious,
-  &mABVNext,
+  &pSplash,
+  &bABVPrevious,
+  &bABVNext,
   NULL
 };
 #endif
@@ -178,7 +187,7 @@ TemperatureSensor temperatureSensors[MAXIMUM_TEMPERATURE_SENSORS];
 int configAddress;
 
 bool newDisplayPage = true;
-bool newDisplayFixed = true;
+bool newDisplayFixed = false;
 int currentDisplayPage = 0;
 int currentDisplaySensor = 0;
 char buffer[100] = {0};
@@ -191,7 +200,7 @@ unsigned long lastDisplayWrite;
 
 void setup() {
 
-  Serial.begin(9600);
+  dbSerialBegin(115200);
 
   // Initialise settings
   initSettings();
@@ -234,32 +243,42 @@ void loop() {
 void initSettings() {
 
   Settings tempSettings;
+  int timeItTook = 0;
 
-  waitForEEPROM();
   EEPROM.setMemPool(memoryBase, EEPROMSizeMega);
-  waitForEEPROM();
   configAddress = EEPROM.getAddress(sizeof(Settings));
-  waitForEEPROM();
-  EEPROM.readBlock(configAddress, tempSettings);
-  waitForEEPROM();
 
+  dbSerialPrintln("From settings:");
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+    dbSerialPrintln(settings.sensors[i].sensorName);
+  }
+  timeItTook = EEPROM.readBlock(configAddress, tempSettings);
+  dbSerialPrintln("From EEPROM:");
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+    dbSerialPrintln(tempSettings.sensors[i].sensorName);
+  }
   if (tempSettings.version != CONFIG_VERSION) {
     // Settings have not been saved before or settings configuration has changed
-    waitForEEPROM();
-    EEPROM.writeBlock(configAddress, settings);
-    waitForEEPROM();
+    timeItTook = EEPROM.writeBlock(configAddress, settings);
+    dbSerialPrintln("From settings:");
+    for (int i = 0; i < settings.sensorsUsed; i++) {
+      dbSerialPrintln(settings.sensors[i].sensorName);
+    }
   }
 
-  EEPROM.readBlock(configAddress, settings);
-  waitForEEPROM();
+  timeItTook = EEPROM.readBlock(configAddress, settings);
+  dbSerialPrintln("From EEPROM:");
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+    dbSerialPrintln(settings.sensors[i].sensorName);
+  }
 
 }
 
 void updateSettings() {
 
-  waitForEEPROM();
+
   EEPROM.updateBlock(configAddress, settings);
-  waitForEEPROM();
+
 
 }
 
@@ -397,7 +416,7 @@ void initPressureSensors() {
   if (!bmp.begin()) {
     // There was a problem detecting the BMP180 ... check your connections
     serialDivider();
-    Serial.println("No BMP180 detected ... Check your wiring or I2C ADDR!");
+    dbSerialPrintln("No BMP180 detected ... Check your wiring or I2C ADDR!");
     serialDivider();
   } else {
     readPressureSensors();
@@ -467,13 +486,13 @@ void readPressureSensors() {
             temperatureSensors[i].tToABV.Pressure(P);
           }
         }
-        else Serial.println("error retrieving pressure measurement\n");
+        else dbSerialPrintln("error retrieving pressure measurement\n");
       }
-      else Serial.println("error starting pressure measurement\n");
+      else dbSerialPrintln("error starting pressure measurement\n");
     }
-    else Serial.println("error retrieving temperature measurement\n");
+    else dbSerialPrintln("error retrieving temperature measurement\n");
   }
-  else Serial.println("error starting temperature measurement\n");
+  else dbSerialPrintln("error starting temperature measurement\n");
 #endif
 
 }
@@ -486,9 +505,12 @@ void readUserInput() {
 
 void initDisplay() {
 #ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+
   nexInit();
-  mABVPrevious.attachPop(mPopABVPrevious, &mABVPrevious);
-  mABVNext.attachPop(mPopABVNext, &mABVNext);
+  pSplash.attachPop(pPopSplash, &pSplash);
+  bABVPrevious.attachPop(bPobABVPrevious, &bABVPrevious);
+  bABVNext.attachPop(bPobABVNext, &bABVNext);
+
 #endif
 }
 
@@ -513,14 +535,21 @@ void writeDisplay() {
   if (newDisplayPage) {
     newDisplayPage = false;
     //write page here
+    char* pageName;
     switch (currentDisplayPage) {
-      case 0:
+      case 1:
         pABV.show();
-        tPageName.setText("Alcohol by Volume");
+        pageName = "Alcohol by Volume";
+#ifdef FEATURE_ENABLED_BENCH_TESTING
+        pageName = "Temperature";
+#endif
+        memset(buffer, 0, sizeof(buffer));
+        strcpy( buffer, pageName);
+        tPageName.setText(buffer);
+        newDisplayFixed = true;
         break;
       default:
-        pABV.show();
-        tPageName.setText("Alcohol by Volume");
+        pSplash.show();
         break;
     }
   }
@@ -528,27 +557,42 @@ void writeDisplay() {
   // write fixed values
   if (newDisplayFixed) {
     newDisplayFixed = false;
-    tSensorName.setText(settings.sensors[currentDisplaySensor].sensorName);
+    switch (currentDisplayPage) {
+      case 1:
+        memset(buffer, 0, sizeof(buffer));
+        dbSerialPrintln(settings.sensors[currentDisplaySensor].sensorName);
+        strcpy( buffer, settings.sensors[currentDisplaySensor].sensorName);
+        tSensorName.setText(buffer);
+        pABVTouchability();
+        break;
+      default:
+        break;
+    }
   }
 
   //write dynamic values
-  double param, intpart, fractpart;
-  param = (double) temperatureSensors[currentDisplaySensor].tToABV.ABV();
+  switch (currentDisplayPage) {
+    case 1:
+      double param, intpart, fractpart;
+      param = (double) temperatureSensors[currentDisplaySensor].tToABV.ABV();
 #ifdef FEATURE_ENABLED_BENCH_TESTING
-  Serial.println("Bench testing mode!");
-  param = (double) temperatureSensors[currentDisplaySensor].tToABV.Temperature();
+      param = (double) temperatureSensors[currentDisplaySensor].tToABV.Temperature();
 #endif
-  if (param < 0) {
-    param = 0.0;
+      if (param < 0) {
+        param = 0.0;
+      }
+      fractpart = modf(param, &intpart);
+      nABVInteger.setValue( (int) intpart);
+      nABVDecimal.setValue( (int) round( fractpart * 10 ) );
+    default:
+      break;
   }
-  fractpart = modf(param, &intpart);
-  nABVInteger.setValue( (int) intpart);
-  nABVDecimal.setValue( (int) round( fractpart * 10 ) );
+
 }
 
 void introSerial() {
 
-  Serial.println("Vision Stills e-Parrot Framework Sketch");
+  dbSerialPrintln("Vision Stills e-Parrot Framework Sketch");
   serialDivider();
 
 }
@@ -572,29 +616,46 @@ void serialDivider() {
 }
 
 #ifdef FEATURE_ENABLED_NEXTION_DISPLAY
-void mPopABVPrevious(void *ptr)
-{
+void pPopSplash(void *ptr) {
+  currentDisplayPage = 1;
+  newDisplayPage = true;
+  writeDisplay();
+}
+
+void bPobABVPrevious(void *ptr) {
 
   if (currentDisplaySensor > 0) {
     currentDisplaySensor--;
     newDisplayFixed = true;
+    writeDisplay();
   }
 }
 
-void mPopABVNext(void *ptr)
-{
+void bPobABVNext(void *ptr) {
 
   if (currentDisplaySensor < (settings.sensorsUsed - 1) ) {
     currentDisplaySensor++;
     newDisplayFixed = true;
+    writeDisplay();
   }
+
 }
 
+void pABVTouchability() {
+
+  if (currentDisplaySensor == 0) {
+    bABVPrevious.disableTouch(7);
+  } else {
+    bABVPrevious.enableTouch(3,5);
+  }
+
+  if (currentDisplaySensor == settings.sensorsUsed - 1) {
+    bABVNext.disableTouch(8);
+  } else {
+    bABVNext.enableTouch(4,6);
+  }
+
+}
 #endif
 
-void waitForEEPROM() {
-  while (!EEPROM.isReady()) {
-    delay(1);
-  }
-}
 
