@@ -7,7 +7,7 @@ const int CONFIG_VERSION = 1;
 //#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_NEXTION_DISPLAY
-//#define FEATURE_ENABLED_BENCH_TESTING
+#define FEATURE_ENABLED_BENCH_TESTING
 
 #include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
 #include "TToABV.h"			// https://github.com/VisionStills/TemperatureToABV
@@ -81,6 +81,13 @@ const int CONFIG_VERSION = 1;
 #define READ_PRESSURE_SENSORS_EVERY 300000
 #define READ_USER_INPUT_EVERY 20
 #define WRITE_DISPLAY_EVERY 200
+
+#ifdef FEATURE_ENABLED_NEXTION_DISPLAY
+#else
+#define dbSerialPrint(a)    Serial.print(a)
+#define dbSerialPrintln(a)  Serial.println(a)
+#define dbSerialBegin(a)    Serial.begin(a)
+#endif
 
 #ifdef FEATURE_ENABLED_NEXTION_DISPLAY
 #else
@@ -250,6 +257,7 @@ void initSettings() {
   EEPROM.setMemPool(memoryBase, EEPROMSizeMega);
   configAddress = EEPROM.getAddress(sizeof(Settings));
 
+<<<<<<< HEAD
   // Read EEPROM settings to temporary location to compare CONFIG_VERSION
   timeItTook = EEPROM.readBlock(configAddress, tempSettings);
   // Update EEPROM from new settings configuration if necessary
@@ -259,13 +267,45 @@ void initSettings() {
   }
   // Read settings from EEPROM
   timeItTook = EEPROM.readBlock(configAddress, settings);
+=======
+  dbSerialPrintln("From settings:");
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+    dbSerialPrintln(settings.sensors[i].sensorName);
+  }
+  timeItTook = EEPROM.readBlock(configAddress, tempSettings);
+  dbSerialPrintln("From EEPROM:");
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+    dbSerialPrintln(tempSettings.sensors[i].sensorName);
+  }
+  if (tempSettings.version != CONFIG_VERSION) {
+    // Settings have not been saved before or settings configuration has changed
+    timeItTook = EEPROM.writeBlock(configAddress, settings);
+    dbSerialPrintln("From settings:");
+    for (int i = 0; i < settings.sensorsUsed; i++) {
+      dbSerialPrintln(settings.sensors[i].sensorName);
+    }
+  }
+
+  timeItTook = EEPROM.readBlock(configAddress, settings);
+  dbSerialPrintln("From EEPROM:");
+  for (int i = 0; i < settings.sensorsUsed; i++) {
+    dbSerialPrintln(settings.sensors[i].sensorName);
+  }
+>>>>>>> refs/remotes/origin/master
 
 }
 
 void updateSettings() {
 
+<<<<<<< HEAD
   EEPROM.updateBlock(configAddress, settings);
   
+=======
+
+  EEPROM.updateBlock(configAddress, settings);
+
+
+>>>>>>> refs/remotes/origin/master
 }
 
 void initTemperatureSensors() {
@@ -628,6 +668,7 @@ void bPobABVNext(void *ptr) {
 }
 
 void pABVTouchability() {
+<<<<<<< HEAD
 
   if (currentDisplaySensor == 0) {
     bABVPrevious.disableTouch(7);
@@ -641,6 +682,21 @@ void pABVTouchability() {
     bABVNext.enableTouch(4, 6);
   }
 
+=======
+
+  if (currentDisplaySensor == 0) {
+    bABVPrevious.disableTouch(7);
+  } else {
+    bABVPrevious.enableTouch(3,5);
+  }
+
+  if (currentDisplaySensor == settings.sensorsUsed - 1) {
+    bABVNext.disableTouch(8);
+  } else {
+    bABVNext.enableTouch(4,6);
+  }
+
+>>>>>>> refs/remotes/origin/master
 }
 #endif
 
