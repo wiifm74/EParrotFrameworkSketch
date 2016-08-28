@@ -7,7 +7,7 @@ const int CONFIG_VERSION = 1;
 //#define FEATURE_ENABLED_SMT172_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
 #define FEATURE_ENABLED_NEXTION_DISPLAY
-#define FEATURE_ENABLED_BENCH_TESTING
+//#define FEATURE_ENABLED_BENCH_TESTING
 
 #include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
 #include "TToABV.h"			// https://github.com/VisionStills/TemperatureToABV
@@ -80,7 +80,7 @@ const int CONFIG_VERSION = 1;
 #define READ_TEMPERATURE_SENSORS_EVERY 400
 #define READ_PRESSURE_SENSORS_EVERY 300000
 #define READ_USER_INPUT_EVERY 20
-#define WRITE_DISPLAY_EVERY 2000
+#define WRITE_DISPLAY_EVERY 200
 
 #ifdef FEATURE_ENABLED_NEXTION_DISPLAY
 #else
@@ -95,6 +95,8 @@ const float defaultPressure = 1013.25;
 const int memoryBase = 32;
 
 /*-----( Declare objects )-----*/
+
+typedef char SensorName[36];
 struct TemperatureSensor {
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
   DeviceAddress address;		// DS18B20 sensor address
@@ -105,9 +107,9 @@ struct TemperatureSensor {
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
   int rtdChannel;       		// Channel value for RTD shield
 #endif
-  char* sensorName;			// Sensor Name
+  SensorName sensorName;			// Sensor Name
+    int state;        			// Input for calculating LIQUID or VAPOR ABV
   TToABV tToABV; 			// Instance or ToToAVB.h
-  int state;        			// Input for calculating LIQUID or VAPOR ABV
 };
 
 #ifdef FEATURE_ENABLED_ADAFRUIT_BMP180
@@ -248,38 +250,22 @@ void initSettings() {
   EEPROM.setMemPool(memoryBase, EEPROMSizeMega);
   configAddress = EEPROM.getAddress(sizeof(Settings));
 
-  dbSerialPrintln("From settings:");
-  for (int i = 0; i < settings.sensorsUsed; i++) {
-    dbSerialPrintln(settings.sensors[i].sensorName);
-  }
+  // Read EEPROM settings to temporary location to compare CONFIG_VERSION
   timeItTook = EEPROM.readBlock(configAddress, tempSettings);
-  dbSerialPrintln("From EEPROM:");
-  for (int i = 0; i < settings.sensorsUsed; i++) {
-    dbSerialPrintln(tempSettings.sensors[i].sensorName);
-  }
+  // Update EEPROM from new settings configuration if necessary
   if (tempSettings.version != CONFIG_VERSION) {
     // Settings have not been saved before or settings configuration has changed
     timeItTook = EEPROM.writeBlock(configAddress, settings);
-    dbSerialPrintln("From settings:");
-    for (int i = 0; i < settings.sensorsUsed; i++) {
-      dbSerialPrintln(settings.sensors[i].sensorName);
-    }
   }
-
+  // Read settings from EEPROM
   timeItTook = EEPROM.readBlock(configAddress, settings);
-  dbSerialPrintln("From EEPROM:");
-  for (int i = 0; i < settings.sensorsUsed; i++) {
-    dbSerialPrintln(settings.sensors[i].sensorName);
-  }
 
 }
 
 void updateSettings() {
 
-
   EEPROM.updateBlock(configAddress, settings);
-
-
+  
 }
 
 void initTemperatureSensors() {
@@ -294,7 +280,7 @@ void initTemperatureSensors() {
 #ifdef FEATURE_ENABLED_PROTOVOLTAICS_PT100_TEMPERATURE_SENSOR
     temperatureSensors[i].rtdChannel = settings.sensors[i].rtdChannel;
 #endif
-    temperatureSensors[i].sensorName = settings.sensors[i].sensorName;
+    memcpy(temperatureSensors[i].sensorName, settings.sensors[i].sensorName, sizeof(SensorName) / sizeof(char));
     temperatureSensors[i].state = settings.sensors[i].state;
   }
 
@@ -311,7 +297,7 @@ void initTemperatureSensors() {
   rtds.Set_RTD_SPS(RTD_SAMPLE_FREQUENCY);						// Slow the shield down
 #endif
 
-  for (int i = 0; i < MAXIMUM_TEMPERATURE_SENSORS; i++) {
+  for (int i = 0; i < settings.sensorsUsed; i++) {
     // Initialise looping/repeated temperature sensor values
 
 #ifdef FEATURE_ENABLED_DS18B20_TEMPERATURE_SENSOR
@@ -646,13 +632,13 @@ void pABVTouchability() {
   if (currentDisplaySensor == 0) {
     bABVPrevious.disableTouch(7);
   } else {
-    bABVPrevious.enableTouch(3,5);
+    bABVPrevious.enableTouch(3, 5);
   }
 
   if (currentDisplaySensor == settings.sensorsUsed - 1) {
     bABVNext.disableTouch(8);
   } else {
-    bABVNext.enableTouch(4,6);
+    bABVNext.enableTouch(4, 6);
   }
 
 }
