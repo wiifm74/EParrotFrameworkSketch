@@ -10,7 +10,7 @@ const int CONFIG_VERSION = 1;
 //#define FEATURE_ENABLED_BENCH_TESTING
 
 #include <EEPROMex.h>			// https://github.com/thijse/Arduino-EEPROMEx
-#include "TToABV.h"			// https://github.com/VisionStills/TemperatureToABV
+#include <TToABV.h>			// https://github.com/VisionStills/TemperatureToABV
 #include "myBoard.h"
 
 // Adafruit BMP180 pressure sensor library
@@ -45,7 +45,8 @@ const int CONFIG_VERSION = 1;
 #endif
 
 #ifdef FEATURE_ENABLED_NEXTION_DISPLAY
-#include "Nextion.h"
+#include <Nextion.h>			// https://github.com/itead/ITEADLIB_Arduino_Nextion
+#include "FrameworkNexButton.h"		// Extends Nextion libary button functionality
 #endif
 
 #ifdef FEATURE_ENABLED_NEXTION_DISPLAY
@@ -137,8 +138,8 @@ NexText tPageName = NexText(1, 1, "tPageName");
 NexText tSensorName = NexText(1, 2, "tSensorName");
 NexNumber nABVInteger = NexNumber(1, 4, "nABVInteger");
 NexNumber nABVDecimal = NexNumber(1, 5, "nABVDecimal");
-NexButton bABVPrevious = NexButton(1, 6, "bPrevious");
-NexButton bABVNext = NexButton(1, 7, "bNext");
+FrameworkNexButton bABVPrevious = FrameworkNexButton(1, 6, "bPrevious");
+FrameworkNexButton bABVNext = FrameworkNexButton(1, 7, "bNext");
 
 NexTouch *nex_listen_list[] =
 {
